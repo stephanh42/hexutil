@@ -56,6 +56,26 @@ class TestHexGrid(unittest.TestCase):
         self.assertEqual(hexutil.HexGrid(32).corners(hexutil.Hex(1, 1)), 
                  [(64, 72), (32, 90), (0, 72), (0, 36), (32, 18), (64, 36)])
 
+    def test_hex_at_coordinates(self):
+        hg = hexutil.HexGrid(32)
+        data = [
+                ((0, 0), hexutil.Hex(0, 0)),
+                ((33, 16), hexutil.Hex(2, 0)),
+                ((30, 20), hexutil.Hex(1, 1))
+                ]
+        for fx in (-1, 1):
+            for fy in (-1, 1):
+                for pixel, hex in data:
+                    x, y = pixel
+                    pixel = (fx*x, fy*y)
+                    x, y = hex
+                    hex = hexutil.Hex(fx*x, fy*y)
+                    self.assertEqual(hg.hex_at_coordinate(*pixel), hex, pixel)
+
+    def test_center(self):
+        hg = hexutil.HexGrid(32)
+        self.assertEqual(hg.center(hexutil.Hex(1, 1)), (32, 54))
+
 
 if __name__ == '__main__':
     unittest.main()

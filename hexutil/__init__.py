@@ -90,3 +90,27 @@ class HexGrid(namedtuple("HexGrid", "width height")):
         x0, y0 = hex
         y0 *= 3
         return [(width * (x + x0), height * (y + y0)) for x, y in self._corners]
+
+    def center(self, hex):
+        """Get the center (as (x, y) tuple) of a hexagon."""
+        width, height = self
+        x, y = hex
+        return (x*width, 3*height*y)
+
+    def hex_at_coordinate(self, x, y):
+        """Given pixel coordinates x and y, get the hexagon under it."""
+        width, height = self
+        x0 = x // width
+        δx = x % width
+        y0 = y // (3 * height)
+        δy = y % (3 * height)
+
+        if (x0 + y0) % 2 == 0:
+            if width * δy < height * (2 * width - δx):
+                return Hex(x0, y0)
+            else:
+                return Hex(x0 + 1, y0 + 1)
+        elif width * δy < height * (width + δx):
+            return Hex(x0 + 1, y0)
+        else:
+            return Hex(x0, y0 + 1)
