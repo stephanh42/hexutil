@@ -61,6 +61,20 @@ class Hex(namedtuple("Hex", "x y")):
 
 origin = Hex(0, 0)
 
+class Rectangle(namedtuple("Rectangle", "x y width height")):
+    """Represents a rectangle.
+    x, y   -- position of lower-left corner
+    width  -- width of rectangle
+    height -- height of rectangle
+    """
+    pass
+
+def _tiled_range(lo, hi, tile_size):
+    return range(lo // tile_size, (hi + tile_size - 1) // tile_size) 
+
+def _make_range(x, width, bloat, grid_size):
+    return _tiled_range(x + grid_size - 1 - bloat, x + width + bloat, grid_size)
+
 class HexGrid(namedtuple("HexGrid", "width height")):
     """Represents the dimensions of a hex grid as painted on the screen.
     The hex grid is assumed to be aligned horizontally, like so:
@@ -97,6 +111,12 @@ class HexGrid(namedtuple("HexGrid", "width height")):
         x, y = hex
         return (x*width, 3*height*y)
 
+    def bounding_box(self, hex):
+        """Get the bounding box (as a Rectangle) of a hexagon."""
+        width, height = self
+        xc, yc = self.center(hex)
+        return Rectangle(xc - width, yc - 2*height, 2*width, 4*height)
+ 
     def hex_at_coordinate(self, x, y):
         """Given pixel coordinates x and y, get the hexagon under it."""
         width, height = self
@@ -114,3 +134,11 @@ class HexGrid(namedtuple("HexGrid", "width height")):
             return Hex(x0 + 1, y0)
         else:
             return Hex(x0, y0 + 1)
+
+    def hexes_in_rectangle(self, rectangle):
+        """Return a sequence with the hex coordinates in the rectangle."""
+        rx, ry, r_width, r_height = rectangle
+        width, height = self
+        x_range = _make_range(rx, r_width, width, width)
+        y_range = _make_range(ry, r_height, 2*height, 3*height)
+        return (Hex(x, y) for y in y_range for x in x_range if (x + y) % 2 == 0)

@@ -76,6 +76,20 @@ class TestHexGrid(unittest.TestCase):
         hg = hexutil.HexGrid(32)
         self.assertEqual(hg.center(hexutil.Hex(1, 1)), (32, 54))
 
+    def test_bounding_box(self):
+        hg = hexutil.HexGrid(32)
+        self.assertEqual(hg.bounding_box(hexutil.Hex(0,2)),
+                hexutil.Rectangle(-32, 72, 64, 72))
+
+    def test_hexes_in_rectangle(self):
+        hg = hexutil.HexGrid(32)
+        self.assertEqual(
+                list(hg.hexes_in_rectangle(hg.bounding_box(hexutil.origin))),
+                [hexutil.Hex(-1, -1), hexutil.Hex(1, -1),
+                 hexutil.Hex(-2, 0), hexutil.Hex(0, 0),
+                 hexutil.Hex(-1, 1), hexutil.Hex(1, 1)]
+                )
+
 
 if __name__ == '__main__':
     unittest.main()
