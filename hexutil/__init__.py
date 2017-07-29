@@ -9,14 +9,17 @@ swap x and y coordinates everywhere.
 from collections import namedtuple
 import math
 
+class InvalidHex(ValueError):
+    pass
+
 class Hex(namedtuple("Hex", "x y")):
     "A single hexagon in a hexagonal grid."""
     _neighbours = ((2, 0), (1, 1), (-1, 1), (-2, 0), (-1, -1), (1, -1))
 
-    def is_valid(self):
-        """Check if this hex is a valid hex."""
-        x, y = self
-        return (x + y) % 2 == 0
+    def __new__(cls, x, y):
+        if (x + y) % 2 != 0:
+            raise InvalidHex("x and y coordinate must sum to an even number")
+        return super().__new__(cls, x, y)
 
     def neighbours(self):
         """Return the 6 direct neighbours of this hex."""

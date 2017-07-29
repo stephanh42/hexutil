@@ -4,18 +4,17 @@ import hexutil
 class TestHex(unittest.TestCase):
 
     def test_is_valid(self):
-        self.assertTrue(hexutil.origin.is_valid())
-        self.assertTrue(hexutil.Hex(-1, -3).is_valid())
-        self.assertFalse(hexutil.Hex(2, -3).is_valid())
+        hexutil.Hex(-1, -3)
+        self.assertRaises(hexutil.InvalidHex, hexutil.Hex, 2, -3)
 
     def test_add(self):
-        self.assertEqual(hexutil.Hex(2, 3) + hexutil.Hex(4, 5), hexutil.Hex(6, 8))
+        self.assertEqual(hexutil.Hex(2, 4) + hexutil.Hex(4, 6), hexutil.Hex(6, 10))
 
     def test_sub(self):
-        self.assertEqual(hexutil.Hex(2, 3) - hexutil.Hex(4, 6), hexutil.Hex(-2, -3))
+        self.assertEqual(hexutil.Hex(2, 4) - hexutil.Hex(3, 7), hexutil.Hex(-1, -3))
 
     def test_neg(self):
-        self.assertEqual(-hexutil.Hex(2, 3), hexutil.Hex(-2, -3))
+        self.assertEqual(-hexutil.Hex(2, 4), hexutil.Hex(-2, -4))
         self.assertEqual(-hexutil.origin, hexutil.origin)
 
     def test_neighbours(self):
