@@ -6,6 +6,7 @@ class HexMap(object):
         player = None
         tiles = {}
         line_lengths = []
+        lights = []
         for y, line in enumerate(str.split("\n")):
             line_lengths.append(len(line))
             for x, ch in enumerate(line):
@@ -15,10 +16,13 @@ class HexMap(object):
                 if ch == '@':
                     player = position
                     ch = '.'
+                elif ch == '*':
+                    lights.append(position)
                 tiles[position] = ch
         self.player = player
         self.tiles = tiles
         self.line_lengths = line_lengths
+        self.lights = lights
 
     def is_transparent(self, pos):
         return self.tiles.get(pos, '#') != '#'
@@ -28,6 +32,12 @@ class HexMap(object):
 
     def get_map(self, max_distance):
         fov = self.field_of_view(max_distance)
+        if self.lights:
+            light_fov = {}
+            for light in self.lights:
+                light.field_of_view(transparent=self.is_transparent, max_distance=max_distance, visible=light_fov)
+        else:
+            light_fov = fov
         lines = []
         for y, line_length in enumerate(self.line_lengths):
             line = []
@@ -38,7 +48,7 @@ class HexMap(object):
                     pos = hexutil.Hex(x, y)
                     if pos == self.player:
                         ch = '@'
-                    elif pos in fov:
+                    elif fov.get(pos, 0) & light_fov.get(pos, 0):
                         ch = self.tiles.get(pos, ' ')
                     else:
                         ch = ' '
@@ -71,6 +81,32 @@ testmap1_out = """
       # . #
        . #
       # #
+"""
+
+testmap2 = HexMap("""
+ # # # # # # # # #
+# # # # # # # # # #
+ # . # # # * # # #
+# # . # # . # # # #
+ # # # . . . . # #
+# # . . @ # # . # #
+ # . # . # # # . #
+# # # # . . # # # #
+ # # . . . . # # #
+# # # # # # # # # #
+""")
+
+testmap2_out = """
+
+          # #
+           * #
+          .
+       . . .
+      . @
+     # . #
+      # .
+
+
 """
 
 
@@ -169,6 +205,10 @@ class TestHexGrid(unittest.TestCase):
 class TestFov(unittest.TestCase):
     def test_fov1(self):
         self.assertEqual(testmap1.get_map(10), testmap1_out)
+
+    def test_fov2(self):
+        self.assertEqual(testmap2.get_map(10), testmap2_out)
+
 
 if __name__ == '__main__':
     unittest.main()
