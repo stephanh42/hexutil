@@ -1,11 +1,88 @@
 import unittest
 import hexutil
 
+class HexMap(object):
+    def __init__(self, str):
+        player = None
+        tiles = {}
+        line_lengths = []
+        for y, line in enumerate(str.split("\n")):
+            line_lengths.append(len(line))
+            for x, ch in enumerate(line):
+                if ch.isspace():
+                    continue
+                position = hexutil.Hex(x, y)
+                if ch == '@':
+                    player = position
+                    ch = '.'
+                tiles[position] = ch
+        self.player = player
+        self.tiles = tiles
+        self.line_lengths = line_lengths
+
+    def is_transparent(self, pos):
+        return self.tiles.get(pos, '#') != '#'
+
+    def field_of_view(self, max_distance):
+        return self.player.field_of_view(transparent=self.is_transparent, max_distance=max_distance)
+
+    def get_map(self, max_distance):
+        fov = self.field_of_view(max_distance)
+        lines = []
+        for y, line_length in enumerate(self.line_lengths):
+            line = []
+            for x in range(line_length):
+                if (x + y) % 2 != 0:
+                    ch = ' '
+                else:
+                    pos = hexutil.Hex(x, y)
+                    if pos == self.player:
+                        ch = '@'
+                    elif pos in fov:
+                        ch = self.tiles.get(pos, ' ')
+                    else:
+                        ch = ' '
+                line.append(ch)
+            lines.append("".join(line).rstrip())
+        return "\n".join(lines)
+
+
+testmap1 = HexMap("""
+ # # # # # # # # #
+# # # # # # # # # #
+ # . # # # # # # #
+# # . # # # # # # #
+ # # # . . . . # #
+# # # . @ # # . # #
+ # # # . . # # . #
+# # # # . # # # # #
+ # # . . # # # # #
+# # # # # # # # # #
+""")
+
+testmap1_out = """
+
+
+
+      # # # #
+     # . . .
+    # . @ #
+     # . . #
+      # . #
+       . #
+      # #
+"""
+
+
 class TestHex(unittest.TestCase):
 
     def test_is_valid(self):
         hexutil.Hex(-1, -3)
         self.assertRaises(hexutil.InvalidHex, hexutil.Hex, 2, -3)
+
+    def test_rotations(self):
+        hex = hexutil.Hex(2, 0)
+        self.assertEqual([r(hex) for r in hexutil.Hex.rotations], hexutil.origin.neighbours())
 
     def test_add(self):
         self.assertEqual(hexutil.Hex(2, 4) + hexutil.Hex(4, 6), hexutil.Hex(6, 10))
@@ -89,6 +166,9 @@ class TestHexGrid(unittest.TestCase):
                  hexutil.Hex(-1, 1), hexutil.Hex(1, 1)]
                 )
 
+class TestFov(unittest.TestCase):
+    def test_fov1(self):
+        self.assertEqual(testmap1.get_map(10), testmap1_out)
 
 if __name__ == '__main__':
     unittest.main()

@@ -7,6 +7,7 @@ swap x and y coordinates everywhere.
 """
 
 from collections import namedtuple
+import operator
 import math
 
 class InvalidHex(ValueError):
@@ -62,7 +63,82 @@ class Hex(namedtuple("Hex", "x y")):
         x, y = self
         return Hex((x + 3 * y) >> 1, (y - x) >> 1)
 
+    def beam(self):
+        fovtree = _fovtree
+        return Beam(self, 0, all_directions, (fovtree.beam(self, dir) for dir in range(6)))
+
+    def field_of_view(self, transparent, max_distance, visible=None):
+        if visible is None:
+            visible = {}
+        self.beam()._field_of_view(transparent, max_distance, visible)
+        return visible
+
+
+all_directions = (1 << 6) - 1
 origin = Hex(0, 0)
+
+Hex.rotations = (
+        lambda x: x,
+        operator.methodcaller("rotate_left"),
+        lambda x: -x.rotate_right(),
+        operator.neg,
+        lambda x: -x.rotate_left(),
+        operator.methodcaller("rotate_right")
+        )
+
+class Beam(namedtuple("Beam", "hexagon distance directions successors")):
+    def _field_of_view(self, transparent, max_distance, visible):
+        if self.distance > max_distance:
+            return
+        hexagon = self.hexagon
+        if transparent(hexagon):
+            visible[hexagon] = all_directions
+            for succ in self.successors:
+                succ._field_of_view(transparent, max_distance, visible)
+        else:
+            visible[hexagon] = self.directions | visible.get(hexagon, 0)
+
+class _FovTree:
+    _corners = ((0, -2), (1, -1), (1, 1), (0, 2))
+    _neighbours = (Hex(1, -1), Hex(2, 0), Hex(1, 1))
+    _cached_successors = None
+
+    def __init__(self, hexagon, direction, angle1, angle2):
+        self.hexagon = hexagon
+        self.angle1 = angle1
+        self.angle2 = angle2
+        self.direction = direction
+        self.hexagons = [rot(hexagon) for rot in Hex.rotations]
+        self.distance = hexagon.distance(origin)
+
+    def get_angle(self, corner):
+        cx, cy = corner
+        x, y = self.hexagon
+        return (3*y + cy)/float(x + cx)
+
+    def beam(self, offset, direction):
+        return Beam(offset + self.hexagons[direction],
+                self.distance,
+                1 << ((self.direction + direction) % 6),
+                (succ.beam(offset, direction) for succ in self.successors()))
+
+    def successors(self):
+        _cached_successors = self._cached_successors
+        if _cached_successors is None:
+            _cached_successors = []
+            angles = [self.get_angle(c) for c in self._corners]
+            hexagon = self.hexagon
+            for i in range(3):
+                c1 = max(self.angle1, angles[i])
+                c2 = min(self.angle2, angles[i+1])
+                if c1 < c2:
+                    nb = self._neighbours[i]
+                    _cached_successors.append(_FovTree(hexagon + nb, (i-1) % 6, c1, c2))
+            self._cached_successors = _cached_successors
+
+        return _cached_successors
+
+_fovtree = _FovTree(Hex(2, 0), 0, -1.0, 1.0)
 
 class Rectangle(namedtuple("Rectangle", "x y width height")):
     """Represents a rectangle.
