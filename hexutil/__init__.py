@@ -63,14 +63,28 @@ class Hex(namedtuple("Hex", "x y")):
         x, y = self
         return Hex((x + 3 * y) >> 1, (y - x) >> 1)
 
-    def beam(self):
-        fovtree = _fovtree
-        return Beam(self, 0, all_directions, (fovtree.beam(self, dir) for dir in range(6)))
-
     def field_of_view(self, transparent, max_distance, visible=None):
+        """Calculate field-of-view.
+        transparent  -- from a Hex to a boolean, indicating of the Hex is transparent
+        max_distance -- maximum distance you can view
+        visible      -- if provided, should be a dict which will be filled and returned
+
+        Returns a dict which has as its keys the hexagons which are visible.
+        The value is a bitmask which indicates which sides of the hexagon are visible.
+        The bitmask is useful if you want to use this function also to compute light sources.
+
+        view_set = player_pos.field_of_view(...)
+        light_set = light_source.field_of_view(...)
+
+        # Is pos visible?
+        if view_set.get(pos, 0) & light_set.get(pos, 0):
+            # yes it is
+        """
         if visible is None:
             visible = {}
-        self.beam()._field_of_view(transparent, max_distance, visible)
+        visible[self] = all_directions
+        for direction in range(6):
+            _fovtree._field_of_view(self, direction, transparent, max_distance, visible)
         return visible
 
 
@@ -85,18 +99,6 @@ Hex.rotations = (
         lambda x: -x.rotate_left(),
         operator.methodcaller("rotate_right")
         )
-
-class Beam(namedtuple("Beam", "hexagon distance directions successors")):
-    def _field_of_view(self, transparent, max_distance, visible):
-        if self.distance > max_distance:
-            return
-        hexagon = self.hexagon
-        if transparent(hexagon):
-            visible[hexagon] = all_directions
-            for succ in self.successors:
-                succ._field_of_view(transparent, max_distance, visible)
-        else:
-            visible[hexagon] = self.directions | visible.get(hexagon, 0)
 
 class _FovTree:
     _corners = ((0, -2), (1, -1), (1, 1), (0, 2))
@@ -116,11 +118,17 @@ class _FovTree:
         x, y = self.hexagon
         return (3*y + cy)/float(x + cx)
 
-    def beam(self, offset, direction):
-        return Beam(offset + self.hexagons[direction],
-                self.distance,
-                1 << ((self.direction + direction) % 6),
-                (succ.beam(offset, direction) for succ in self.successors()))
+    def _field_of_view(self, offset, direction, transparent, max_distance, visible):
+        if self.distance > max_distance:
+            return
+        hexagon = offset + self.hexagons[direction]
+        if transparent(hexagon):
+            visible[hexagon] = all_directions
+            for succ in self.successors():
+                succ._field_of_view(offset, direction, transparent, max_distance, visible)
+        else:
+            directions = 1 << ((self.direction + direction) % 6)
+            visible[hexagon] = directions | visible.get(hexagon, 0)
 
     def successors(self):
         _cached_successors = self._cached_successors
