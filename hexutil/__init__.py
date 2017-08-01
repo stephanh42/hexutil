@@ -7,6 +7,7 @@ swap x and y coordinates everywhere.
 """
 
 from collections import namedtuple
+from heapq import heappush, heappop
 import operator
 import math
 
@@ -86,6 +87,17 @@ class Hex(namedtuple("Hex", "x y")):
         for direction in range(6):
             _fovtree._field_of_view(self, direction, transparent, max_distance, visible)
         return visible
+
+    def find_path(self, destination, passable, cost=lambda pos: 1):
+        """Perform path-finding.
+        self        -- Starting position for path finding.
+        destination -- Destination position for path finding.
+        passable    -- Function of one position, returning True if we can move through this hex.
+        cost        -- cost function for moving through a hex. Should return a value ≥ 1. By default all costs are 1.
+        """
+        pathfinder = HexPathFinder(self, destination, passable, cost)
+        pathfinder.run()
+        return pathfinder.path
 
 
 all_directions = (1 << 6) - 1
@@ -229,3 +241,81 @@ class HexGrid(namedtuple("HexGrid", "width height")):
         x_range = _make_range(rx, r_width, width, width)
         y_range = _make_range(ry, r_height, 2*height, 3*height)
         return (Hex(x, y) for y in y_range for x in x_range if (x + y) % 2 == 0)
+
+class HexPathFinder:
+    """A* path-finding on the hex grid.
+    All positions are represented as Hex objects.
+
+    Important data attributes: 
+    found -- True if path-finding is complete and we found a path
+    done  -- True if path-finding is complete: we either found a path or know there isn't one
+    path  -- The path, as a tuple of positions from start to destination (including both). Empty tuple if found is False.
+    """
+
+    found = False
+    done = False
+    path = None
+    
+    def __init__(self, start, destination, passable, cost=lambda pos: 1):
+        """Create a new HexPathFinder object.
+        start       -- Starting position for path finding.
+        destination -- Destination position for path finding.
+        passable    -- Function of one position, returning True if we can move through this hex.
+        cost        -- cost function for moving through a hex. Should return a value ≥ 1. By default all costs are 1.
+        """
+        self.start = start
+        self.destination = destination
+        self.passable = passable
+        self.cost = cost
+        self.closedset = set()
+        self.openset = [(self._heuristic(start), 0, start, ())]
+
+    def _heuristic(self, position):
+        return self.destination.distance(position)
+
+    def _compute_path(self, path):
+        result = []
+        while path:
+            pos, path = path
+            result.append(pos)
+        return result[::-1]
+
+    def run_n(self, n):
+        """Run at most n path-finding steps.
+        This method does a bounded amount of work, and is therefore useful
+        if pathfinding must be interleaved with interactive behaviour or may
+        be interrupted.
+         """
+        openset = self.openset
+        closedset = self.closedset
+        passable = self.passable
+        cost = self.cost
+        destination = self.destination
+        heuristic = self._heuristic
+
+        for i in range(n):
+            if not openset:
+                self.done = True
+                return
+            h, cur_cost, pos, path = heappop(openset)
+            if pos in closedset:
+                continue
+            new_path = (pos, path)
+            if pos == destination:
+                self.path = self._compute_path(new_path)
+                self.found = self.done = True
+                del openset[:]
+                return
+            closedset.add(pos)
+            for new_pos in pos.neighbours():
+                if (not passable(new_pos)) or (new_pos in closedset):
+                    continue
+                new_cost = cur_cost + cost(new_pos)
+                new_h = new_cost + heuristic(new_pos)
+                heappush(openset, (new_h, new_cost, new_pos, new_path))
+
+    def run(self):
+        """Run path-finding until done, that is, we either found a path or know there isn't one.
+        """
+        while not self.done:
+            self.run_n(100)
