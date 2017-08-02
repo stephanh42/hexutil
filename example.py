@@ -22,12 +22,23 @@ class Level(object):
             tiles[tile] = '.'
             tile = random.choice(tile.neighbours())
         self.tiles = tiles
+        self.seen_tiles = {}
 
     def get_tile(self, hexagon):
         return self.tiles.get(hexagon, '#')
 
+    def get_seen_tile(self, hexagon):
+        return self.seen_tiles.get(hexagon, ' ')
+
     def is_passable(self, hexagon):
+        return self.get_tile(hexagon) not in '#~'
+
+    def is_transparent(self, hexagon):
         return self.get_tile(hexagon) != '#'
+ 
+    def update_fov(self, fov):
+        for hexagon in fov:
+            self.seen_tiles[hexagon] = self.get_tile(hexagon)
 
 
 class GameWidget(QtWidgets.QWidget):
@@ -54,7 +65,14 @@ class GameWidget(QtWidgets.QWidget):
         self.font.setStyleHint(QtGui.QFont.SansSerif)
         self.pen = QtGui.QPen()
         self.pen.setWidth(2)
-        self.select_brush = QtGui.QBrush(QtGui.QColor(128, 128, 255, 128))
+        self.select_brush = QtGui.QBrush(QtGui.QColor(127, 127, 255, 127))
+        self.unseen_brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 127))
+
+        self.update_fov()
+
+    def update_fov(self):
+        self.fov = self.player.field_of_view(transparent=self.level.is_transparent, max_distance=10)
+        self.level.update_fov(self.fov)
 
     def hexagon_of_pos(self, pos):
         """Compute the hexagon at the screen position."""
@@ -63,8 +81,21 @@ class GameWidget(QtWidgets.QWidget):
         yc = size.height()//2
         return self.player + self.hexgrid.hex_at_coordinate(pos.x() - xc, pos.y() - yc)
 
-    def mouseMoveEvent(self, event):
+    def mousePressEvent(self, event):
         hexagon = self.hexagon_of_pos(event.pos())
+        path = self.player.find_path(hexagon, self.level.is_passable)
+        if path and len(path) >= 2:
+            self.player = path[1]
+            self.update_fov()
+            self.select_hexagon(event.pos())
+            self.repaint()
+
+    def mouseMoveEvent(self, event):
+        self.select_hexagon(event.pos())
+
+    def select_hexagon(self, pos):
+        """Select hexagon and path to hexagon at position."""
+        hexagon = self.hexagon_of_pos(pos)
         if hexagon != self.selected_hexagon:
             self.selected_hexagon = hexagon
             path = self.player.find_path(hexagon, self.level.is_passable)
@@ -75,9 +106,11 @@ class GameWidget(QtWidgets.QWidget):
             self.repaint()
  
     def paintEvent(self, event):
+        # compute center of window
         size = self.size()
         xc = size.width()//2
         yc = size.height()//2
+        # bounding box when we translate the origin to be at the center
         bbox = hexutil.Rectangle(-xc, -yc, size.width(), size.height())
         hexgrid = self.hexgrid
         painter = QtGui.QPainter()
@@ -93,10 +126,15 @@ class GameWidget(QtWidgets.QWidget):
             for hexagon in hexgrid.hexes_in_rectangle(bbox):
                 polygon = QtGui.QPolygon([QtCore.QPoint(*corner) for corner in hexgrid.corners(hexagon)])
                 hexagon2 = hexagon + self.player
-                tile = self.level.get_tile(hexagon2)
+                tile = self.level.get_seen_tile(hexagon2)
+                if tile == ' ':
+                    continue
                 painter.setBrush(self._tile_brushes[tile])
                 painter.drawPolygon(polygon)
-                if hexagon in self.selected_path:
+                if hexagon2 not in self.fov:
+                    painter.setBrush(self.unseen_brush)
+                    painter.drawPolygon(polygon)
+                if hexagon2 in self.selected_path:
                     painter.setBrush(self.select_brush)
                     painter.drawPolygon(polygon)
                 if hexagon2 == self.player:
