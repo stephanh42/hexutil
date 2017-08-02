@@ -3,7 +3,9 @@ import hexutil
 
 class HexMap(object):
     def __init__(self, str):
+        self.source = str
         player = None
+        target = None
         tiles = {}
         line_lengths = []
         lights = []
@@ -16,10 +18,15 @@ class HexMap(object):
                 if ch == '@':
                     player = position
                     ch = '.'
+                elif ch == '%':
+                    ch = '.'
+                elif ch == 'T':
+                    target = position
                 elif ch == '*':
                     lights.append(position)
                 tiles[position] = ch
         self.player = player
+        self.target = target
         self.tiles = tiles
         self.line_lengths = line_lengths
         self.lights = lights
@@ -27,17 +34,23 @@ class HexMap(object):
     def is_transparent(self, pos):
         return self.tiles.get(pos, '#') != '#'
 
+    def is_passable(self, pos):
+        return self.tiles.get(pos, '#') not in "#~"
+
     def field_of_view(self, max_distance):
         return self.player.field_of_view(transparent=self.is_transparent, max_distance=max_distance)
 
-    def get_map(self, max_distance):
-        fov = self.field_of_view(max_distance)
-        if self.lights:
-            light_fov = {}
-            for light in self.lights:
-                light.field_of_view(transparent=self.is_transparent, max_distance=max_distance, visible=light_fov)
+    def get_map(self, max_distance=None, path=frozenset()):
+        if max_distance is not None:
+            fov = self.field_of_view(max_distance)
+            if self.lights:
+                light_fov = {}
+                for light in self.lights:
+                    light.field_of_view(transparent=self.is_transparent, max_distance=max_distance, visible=light_fov)
+            else:
+                light_fov = fov
         else:
-            light_fov = fov
+            fov = light_fov = None
         lines = []
         for y, line_length in enumerate(self.line_lengths):
             line = []
@@ -48,8 +61,11 @@ class HexMap(object):
                     pos = hexutil.Hex(x, y)
                     if pos == self.player:
                         ch = '@'
-                    elif fov.get(pos, 0) & light_fov.get(pos, 0):
-                        ch = self.tiles.get(pos, ' ')
+                    elif fov is None or (fov.get(pos, 0) & light_fov.get(pos, 0)):
+                        if pos in path:
+                            ch = '%'
+                        else:
+                            ch = self.tiles.get(pos, ' ')
                     else:
                         ch = ' '
                 line.append(ch)
@@ -64,9 +80,9 @@ testmap1 = HexMap("""
 # # . # # # # # # #
  # # # . . . . # #
 # # # . @ # # . # #
- # # # . . # # . #
-# # # # . # # # # #
- # # . . # # # # #
+ # # ~ % . # # . #
+# # ~ # % # # # # #
+ # # T % # # # # #
 # # # # # # # # # #
 """)
 
@@ -77,9 +93,9 @@ testmap1_out = """
       # # # #
      # . . .
     # . @ #
-     # . . #
-      # . #
-       . #
+   # ~ . . #
+  # ~ # . #
+   #   . #
       # #
 """
 
@@ -88,9 +104,9 @@ testmap2 = HexMap("""
 # # # # # # # # # #
  # . # # # * # # #
 # # . # # . # # # #
- # # # . . . . # #
-# # . . @ # # . # #
- # . # . # # # . #
+ # # # . % % % # #
+# # . . @ # # % # #
+ # . # . # # # T #
 # # # # . . # # # #
  # # . . . . # # #
 # # # # # # # # # #
@@ -209,6 +225,14 @@ class TestFov(unittest.TestCase):
     def test_fov2(self):
         self.assertEqual(testmap2.get_map(10), testmap2_out)
 
+class TestPathFinding(unittest.TestCase):
+    def test_path1(self):
+        path = frozenset(testmap1.player.find_path(testmap1.target, testmap1.is_passable)[:-1])
+        self.assertEqual(testmap1.get_map(path=path), testmap1.source)
+
+    def test_path2(self):
+        path = frozenset(testmap2.player.find_path(testmap2.target, testmap2.is_passable)[:-1])
+        self.assertEqual(testmap2.get_map(path=path), testmap2.source)
 
 if __name__ == '__main__':
     unittest.main()
