@@ -10,6 +10,7 @@ from collections import namedtuple
 from heapq import heappush, heappop
 import operator
 import math
+import random
 
 class InvalidHex(ValueError):
     pass
@@ -27,6 +28,22 @@ class Hex(namedtuple("Hex", "x y")):
         """Return the 6 direct neighbours of this hex."""
         x, y = self
         return [Hex(x+dx, y+dy) for dx, dy in self._neighbours]
+
+    def random_neighbour(self, random=random):
+        """Return a random neighbour of this hexagon."""
+        x, y = self
+        dx, dy = random.choice(self._neighbours)
+        return Hex(x+dx, y+dy)
+
+    def random_walk(self, N, random=random):
+        """Yield random walk of length N.
+        Returns a generator of length N+1 since it includes the start point.
+        """
+        position = self
+        yield position
+        for i in range(N):
+            position = position.random_neighbour(random)
+            yield position
 
     def __add__(self, other):
         x1, y1 = self

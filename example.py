@@ -3,7 +3,6 @@ Example of using hexutil.
 A simple roguelike kernel written in PyQt5.
 """
 
-import random
 import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -17,10 +16,10 @@ class Level(object):
     def __init__(self, size):
         """Create level with a random walk"""
         tiles = {}
-        tile = hexutil.origin 
-        for i in range(size):
-            tiles[tile] = '.'
-            tile = random.choice(tile.neighbours())
+        for tile in hexutil.origin.random_walk(100):
+            tiles[tile] = '~' # add water
+        for tile in hexutil.origin.random_walk(size):
+            tiles[tile] = '.' # add floor tiles
         self.tiles = tiles
         self.seen_tiles = {}
 
@@ -46,6 +45,7 @@ class GameWidget(QtWidgets.QWidget):
 
     _tile_brushes = {
             '.' : QtGui.QBrush(QtGui.QColor("yellow")),
+            '~' : QtGui.QBrush(QtGui.QColor("blue")),
             '#' : QtGui.QBrush(QtGui.QColor("brown")),
             }
 
