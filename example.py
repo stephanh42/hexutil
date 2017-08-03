@@ -58,7 +58,7 @@ class GameWidget(QtWidgets.QWidget):
 
         self.level = Level(500)
         self.player = hexutil.origin
-        self.hexgrid = hexutil.HexGrid(32)
+        self.hexgrid = hexutil.HexGrid(24)
 
         # initialize GUI objects needed for painting
         self.font = QtGui.QFont("Helvetica", 20)
@@ -116,6 +116,13 @@ class GameWidget(QtWidgets.QWidget):
         painter = QtGui.QPainter()
         painter.begin(self)
         try:
+            # paint background black
+            painter.save()
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QtGui.QColor())
+            painter.drawRect(0, 0, size.width(), size.height())
+            painter.restore()
+
             # set up drawing state
             painter.setPen(self.pen)
             painter.setRenderHint(QtGui.QPainter.Antialiasing)
